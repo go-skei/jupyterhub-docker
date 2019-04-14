@@ -1,0 +1,60 @@
+version: '3.5'
+
+networks:
+  jupyternet:
+    name: ${DOCKER_NETWORK_NAME}
+  proxy:
+    name: proxy
+    external: True
+
+volumes:
+  jupyterhub_data:
+  jupyterhub_config:
+
+services:
+  jupyterhub:
+    container_name: ${HUB_IP}
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyterhub
+      args:
+        JUPYTERHUB_VERSION: ${JUPYTERHUB_VERSION}
+    image: "${JUPYTERHUB_IMAGE_NAME}:${JUPYTERHUB_VERSION}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - jupyterhub_config:${JUPYTERHUB_CONFIG_DIR}
+      - jupyterhub_data:${DOCKER_NOTEBOOK_DIR}
+      - ./cull_idle_servers.py:${JUPYTERHUB_CONFIG_DIR}/cull_idle_servers.py:ro
+      - ./jupyterhub_config.py:${JUPYTERHUB_CONFIG_DIR}/jupyterhub_config.py:ro
+    environment:
+      DOCKER_NETWORK_NAME:
+      DOCKER_NOTEBOOK_IMAGE:
+      DOCKER_NOTEBOOK_DIR:
+      HUB_IP:
+      OAUTH_CALLBACK_URL: "https://${DOMAIN_NAME}/hub/oauth_callback"
+      OAUTH_CLIENT_ID:
+      OAUTH_CLIENT_SECRET:
+    labels:
+      - "traefik.docker.network=proxy"
+      - "traefik.enable=true"
+      - "traefik.basic.frontend.rule=Host:${DOMAIN_NAME}"
+      - "traefik.basic.port=8000"
+      - "traefik.basic.protocol=http"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+    restart: on-failure
+    networks:
+      - jupyternet
+      - proxy
+    command: --debug
+
+  # This service does nothing (exits immediately). It exists so that 
+  # `docker-compose up` will automatically pull the desired image for our single
+  # user servers.
+  singleuser_throwaway:
+    image: ${DOCKER_NOTEBOOK_IMAGE}
+    container_name: jupyterlab-throwaway
+    network_mode: none
+    command: echo

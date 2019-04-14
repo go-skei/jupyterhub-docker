@@ -1,0 +1,12 @@
+ARG JUPYTERHUB_VERSION
+FROM jupyterhub/jupyterhub:$JUPYTERHUB_VERSION
+
+# Install dockerspawner, oauth, postgres.
+RUN /opt/conda/bin/conda install -yq psycopg2=2.7 && \
+    /opt/conda/bin/conda clean -tipsy && \
+    /opt/conda/bin/pip install --no-cache-dir \
+        oauthenticator==0.8.* \
+        dockerspawner==0.9.*
+
+# Run jupyterhub by default.
+ENTRYPOINT jupyterhub
